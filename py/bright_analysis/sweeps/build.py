@@ -23,58 +23,22 @@ This part is specified as mock root in the yaml:
 
 
 """
+from __future__ import (absolute_import, division, print_function,
+                        unicode_literals)
+
 import numpy as np
 import sys
 import os
-import argparse
 import yaml
 import glob
 import time
-import datetime
 from astropy.table import Table, Column
 from desitarget.mock.io import decode_rownum_filenum
 from astropy.io import fits
 
+from bright_analysis.util import match
+
 class SweepDirExistsError(Exception): pass
-
-############################################################
-def match(arr1,arr2,arr2_sorted=False):
-    """
-    For each element in arr1, return the index of the element with the same
-    value in arr2, or -1 if there is no element with the same value.
-
-    Neither arr1 nor arr2 have to be sorted first. Only arr2 is sorted in
-    operation. If it's already sorted, save time by setting arr2_sorted=True.
-
-    Code by John Helly, Andrew Cooper
-    """
-    if arr2_sorted:
-        idx  = slice(0,len(arr2))
-        tmp2 = arr2
-    else:
-        idx  = np.argsort(arr2)
-        tmp2 = arr2[idx]
-
-    # Find where the elements of arr1 can be inserted in arr2
-    ptr_l = np.searchsorted(tmp2,arr1,side='left')
-    ptr_r = np.searchsorted(tmp2,arr1,side='right')
-
-    if np.isscalar(ptr_l):
-        ptr_l = array([ptr_l])
-        ptr_r = array([ptr_r])
-
-    # Return -1 where no match is found. Note that searchsorted returns
-    # len(tmp2) for values beyond the maximum of tmp2. This cannot be used as
-    # an index.
-    filter        = ptr_r-ptr_l == 0
-    ptr_l[filter] = -1
-    del(ptr_r,filter)
-
-    # Put ptr back in original order
-    ind   = np.arange(len(arr2))[idx]
-    ptr_l = np.where(ptr_l >= 0, ind[ptr_l], -1)
-
-    return ptr_l
 
 ############################################################
 def mock_map_for_source_from_file(map_id_file,source):
@@ -114,7 +78,7 @@ def make_directory_structure(config_file,source_name,map_id_filename,sweep_mock_
                              dtype={'names': ('SOURCENAME', 'FILEID', 'FILENAME'),
                                     'formats': ('S10', 'i4', 'S256')})
 
-    w          = np.where(map_id_file['SOURCENAME']==source_name.encode())
+    w = np.where(map_id_file['SOURCENAME']==source_name.encode())
     mock_paths = map_id_file['FILENAME'][w]
 
     # Original mock path.
@@ -429,50 +393,4 @@ def make_mock_sweeps(config_file,source_name,input_dir,epoch_dir,map_id_file_pat
             t = Table(truth_table[subset_this_file])[rows_this_file_all_sort]
             t.write(new_path_truth_subset)
             print('Wrote {}'.format(new_path_truth_subset))
-  
     return
-
-############################################################
-if __name__ == '__main__':
-    parser = argparse.ArgumentParser()
-    parser.add_argument('source_name')
-    parser.add_argument('--config',         "-c", default='input.yaml')
-    parser.add_argument("--input_dir",      "-I", help="Path to the truth.fits and targets.fits files", type=str, default="./")
-    parser.add_argument("--map_id_file",    "-M", help="Path to map_id_file", type=str, default=None)
-    parser.add_argument("--override_root",  "-R", help="Override mock root directory in config yaml", type=str, default=None)
-    parser.add_argument("--output_root",    "-O", help="Survey simulation output dir (above epochs)", type=str, default="./")
-    parser.add_argument("--sweep_mock_root","-S", help="Root path under which to reconstruct the mock file structure", type=str, default="./")
-    parser.add_argument("--not_dry_run",    "-x", help="Create any directories and files; the default is a dry run",action='store_true')
-    parser.add_argument("--tilefiles",      "-t", help="Process tilemap files",action='store_true')
-    args = parser.parse_args()
-
-    # Avoid double negatives
-    dry_run = not args.not_dry_run
-
-    if args.map_id_file is None:
-        map_id_file = os.path.join(args.input_dir,'map_id_filename.txt')
-    else:
-        map_id_file = args.map_id_file
-
-    # Setup directories for sweeps, which mirror the mock layout
-    make_directory_structure(args.config,args.source_name,map_id_file,args.sweep_mock_root,
-                             override_root = args.override_root, dry_run=dry_run)
-
-    # Link redshift catalogue to truth for each epoch.
-    epoch_dirs = glob.glob("%s/[0-9]/"%(args.output_root))
-    for epoch_dir in epoch_dirs:
-        print('Epoch directory: {}'.format(epoch_dir))
-        if not dry_run:
-            if args.tilefiles:
-                concatenate_tilefiles(epoch_dir,args.sweep_mock_root)
-
-            make_mock_sweeps(args.config,args.source_name,args.input_dir,epoch_dir,map_id_file,
-                             args.sweep_mock_root,override_root = args.override_root, dry_run=dry_run)
-
-    if not dry_run:
-        with open(os.path.join(args.sweep_mock_root,'sweep_params'),'w') as f:
-            f.write(yaml.dump({'time': datetime.datetime.now()}))
-            f.write(yaml.dump(args.__dict__))
-        print('Done!')
-    else:
-        print('This was a dry run, nothing was created!')
