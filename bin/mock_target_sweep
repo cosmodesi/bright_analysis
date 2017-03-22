@@ -1,0 +1,62 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
+import bright_analysis.sweeps.build as build
+
+import sys
+import os
+import datetime
+
+import argparse
+import glob
+
+############################################################
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('source_name')
+    parser.add_argument('--config',         "-c", default='input.yaml')
+    parser.add_argument("--input_dir",      "-I", help="Path to the truth.fits and targets.fits files", type=str, default="./")
+    parser.add_argument("--map_id_file",    "-M", help="Path to map_id_file", type=str, default=None)
+    parser.add_argument("--override_root",  "-R", help="Override mock root directory in config yaml", type=str, default=None)
+    parser.add_argument("--output_root",    "-O", help="Survey simulation output dir (above epochs)", type=str, default="./")
+    parser.add_argument("--sweep_mock_root","-S", help="Root path under which to reconstruct the mock file structure", type=str, default="./")
+    parser.add_argument("--not_dry_run",    "-x", help="Create any directories and files; the default is a dry run",action='store_true')
+    parser.add_argument("--tilefiles",      "-t", help="Process tilemap files",action='store_true')
+    args = parser.parse_args()
+
+    # Avoid double negatives
+    dry_run = not args.not_dry_run
+
+    if args.map_id_file is None:
+        map_id_file = os.path.join(args.input_dir,'map_id_filename.txt')
+    else:
+        map_id_file = args.map_id_file
+
+    # Setup directories for sweeps, which mirror the mock layout
+    build.make_directory_structure(args.config,args.source_name,map_id_file,args.sweep_mock_root,
+                             override_root = args.override_root, dry_run=dry_run)
+
+    # Link redshift catalogue to truth for each epoch.
+    epoch_dirs = glob.glob("%s/[0-9]/"%(args.output_root))
+    for epoch_dir in epoch_dirs:
+        print('Epoch directory: {}'.format(epoch_dir))
+        if not dry_run:
+            if args.tilefiles:
+                build.concatenate_tilefiles(epoch_dir,args.sweep_mock_root)
+
+            build.make_mock_sweeps(args.config,args.source_name,args.input_dir,epoch_dir,map_id_file,
+                             args.sweep_mock_root,override_root = args.override_root, dry_run=dry_run)
+
+    if not dry_run:
+        with open(os.path.join(args.sweep_mock_root,'sweep_params'),'w') as f:
+            f.write(yaml.dump({'time': datetime.datetime.now()}))
+            f.write(yaml.dump(args.__dict__))
+        print('Done!')
+    else:
+        print('This was a dry run, nothing was created!')
+
+############################################################
+if __name__ == '__main__':
+    from sys import exit
+    exit(main())
+
