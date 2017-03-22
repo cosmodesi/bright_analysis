@@ -1,9 +1,9 @@
 # Licensed under a 3-clause BSD style license - see LICENSE.rst
 # -*- coding: utf-8 -*-
 """
-============
-desitemplate
-============
+===============
+bright_analysis
+===============
 
 This package is a template for other DESI_ Python_ packages.
 
