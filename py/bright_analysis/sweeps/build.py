@@ -36,7 +36,11 @@ from astropy.table import Table, Column
 from desitarget.mock.io import decode_rownum_filenum
 from astropy.io import fits
 
-from bright_analysis.util import match
+import desimodel
+import desimodel.footprint as footprint
+import desimodel.io
+
+from bright_analysis.util.match import match
 
 class SweepDirExistsError(Exception): pass
 
@@ -85,6 +89,9 @@ def make_directory_structure(config_file,source_name,map_id_filename,sweep_mock_
     root_mock_dir = params['sources'][source_name]['root_mock_dir']
 
     if override_root is not None:
+        print('User override for mock root directory mocks from survey config yaml.')
+        print('    YAML: %s'%(root_mock_dir))
+        print('    USER: %s'%(override_root))
         original_root_mock_dir = root_mock_dir
         root_mock_dir          = override_root
 
@@ -193,7 +200,7 @@ def match_zcat_truth(config_file,input_dir,epoch_dir):
     else:
         target_table = TARGET_CACHE
         print('Have {} rows from target in memory'.format(len(target_table)))
- 
+
     # Load redshift catalogue for this epoch
     t0 = time.time()
     zcat = Table.read(os.path.join(epoch_dir, 'zcat.fits'))
@@ -213,9 +220,15 @@ def match_zcat_truth(config_file,input_dir,epoch_dir):
 
 ############################################################
 def make_mock_sweeps(config_file,source_name,input_dir,epoch_dir,map_id_file_path,
-                     sweep_mock_root,override_root=None,dry_run=True,match_on_objid=True):
+                     sweep_mock_root,override_root=None,dry_run=True,match_on_objid=False):
     """
     """
+    if match_on_objid:
+        print('NOTE: Matching on mock column "objid", only makes sense for 2016 data challenge outputs!')
+
+    # Load the tile definitions
+    TILES  = desimodel.io.load_tiles()
+
     epoch = int(os.path.split(epoch_dir.strip(os.path.sep))[-1])
     print('Epoch: {}'.format(epoch))
 
@@ -251,8 +264,22 @@ def make_mock_sweeps(config_file,source_name,input_dir,epoch_dir,map_id_file_pat
     # Decode rowid and fileid for observed targets associated with this source
     obs_rowid, obs_fileid = decode_rownum_filenum(truth_table['MOCKID'][itruth_for_izcat][obs_this_source])
 
+    # Determine if target/truth rows for this source are in footprint
+    print('Testing truth coordinates against DESIMODEL v %s'%(desimodel.__version__))
+    footprint_flag_targets_truth   = footprint.is_point_in_desi(TILES,
+                                                                truth_table['RA'][truth_rows_for_source],
+                                                                truth_table['DEC'][truth_rows_for_source])
+
     # Read original files
     fileid_to_read = np.array(list(set(fileid)))
+
+
+    # Different mocks have different names for sky coordinate columns
+    # Auto-detect this based on a list of possibilities.
+    ra_column, dec_column = None, None
+    # Names to try in order of priority
+    ra_names  = ['RA','ra','_RA','_ra']
+    dec_names = ['DEC','dec','DE','_DEC','_dec','_DE']
 
     for ifile in fileid_to_read:
 
@@ -282,6 +309,29 @@ def make_mock_sweeps(config_file,source_name,input_dir,epoch_dir,map_id_file_pat
 
         # Read the mock data for this file ID
         data  = fits.getdata(filename,1)
+
+        # Set column names if not already set
+        if ra_column is None:
+            for ra_name in ra_names:
+                if ra_name in data.dtype.names:
+                    ra_column = ra_name
+                    break
+            if ra_column is None:
+                raise Exception('No RA column found in mock data columns')
+ 
+        if dec_column is None:
+            for dec_name in dec_names:
+                if dec_name in data.dtype.names:
+                    dec_column = dec_name
+                    break
+            if dec_column is None:
+                raise Exception('No DEC column found in mock data columns')
+        
+        # Flag mock rows in footprint
+        print('Testing mock coordinates against DESIMODEL v %s'%(desimodel.__version__))
+        footprint_flag = footprint.is_point_in_desi(TILES,
+                                                    data[ra_column],
+                                                    data[dec_column])
 
         # Select truth rows for this file ID
         fileid_mask     = fileid == ifile
@@ -367,6 +417,9 @@ def make_mock_sweeps(config_file,source_name,input_dir,epoch_dir,map_id_file_pat
             t = Table(data[observed_this_epoch])
             t.add_column(Column(input_target_row[observed_this_epoch],name='TARGETROW'))
             t.add_column(Column(target_table[input_target_row[observed_this_epoch]]['TARGETID'],name='TARGETID'))
+            # Include flag for targets in actual footprint
+            t.add_column(Column(footprint_flag[observed_this_epoch],name='IN_FOOTPRINT'))
+
             # Strict check
             assert(np.allclose(t['RA'],target_table[t['TARGETROW']]['RA'],atol=1e-5))
             t.write(new_path_observed)
@@ -376,6 +429,9 @@ def make_mock_sweeps(config_file,source_name,input_dir,epoch_dir,map_id_file_pat
             t = Table(data[selected_not_observed])
             t.add_column(Column(input_target_row[selected_not_observed],name='TARGETROW'))
             t.add_column(Column(target_table[input_target_row[selected_not_observed]]['TARGETID'],name='TARGETID'))
+            # Include flag for targets in actual footprint
+            t.add_column(Column(footprint_flag[selected_not_observed],name='IN_FOOTPRINT'))
+
             # Strict check
             assert(np.allclose(t['RA'],target_table[t['TARGETROW']]['RA'],atol=1e-5))
             t.write(new_path_unobserved)
@@ -385,12 +441,14 @@ def make_mock_sweeps(config_file,source_name,input_dir,epoch_dir,map_id_file_pat
             # Save in rowid order
             subset_this_file = truth_rows_for_source[fileid_mask]
             t = Table(target_table[subset_this_file])[rows_this_file_all_sort]
+            t.add_column(Column((footprint_flag_targets_truth[fileid_mask])[rows_this_file_all_sort],name='IN_FOOTPRINT'))
             t.write(new_path_targets_subset)
             print('Wrote {}'.format(new_path_targets_subset))
 
             # 4. Make a file extracted from truth for this mock brick
             subset_this_file = truth_rows_for_source[fileid_mask]
             t = Table(truth_table[subset_this_file])[rows_this_file_all_sort]
+            t.add_column(Column((footprint_flag_targets_truth[fileid_mask])[rows_this_file_all_sort],name='IN_FOOTPRINT'))
             t.write(new_path_truth_subset)
             print('Wrote {}'.format(new_path_truth_subset))
     return
