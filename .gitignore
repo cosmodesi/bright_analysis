@@ -29,7 +29,6 @@ distribute-*.tar.gz
 .*.swp
 .*.swo
 *~
-py/*/_version.py
 
 # Mac OSX
 .DS_Store
