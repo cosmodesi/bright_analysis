@@ -9,9 +9,12 @@ import datetime
 
 import argparse
 import glob
+import yaml
 
 ############################################################
 def main():
+    """
+    """
     parser = argparse.ArgumentParser()
     parser.add_argument('source_name')
     parser.add_argument('--config',         "-c", default='input.yaml')
@@ -22,6 +25,7 @@ def main():
     parser.add_argument("--sweep_mock_root","-S", help="Root path under which to reconstruct the mock file structure", type=str, default="./")
     parser.add_argument("--not_dry_run",    "-x", help="Create any directories and files; the default is a dry run",action='store_true')
     parser.add_argument("--tilefiles",      "-t", help="Process tilemap files",action='store_true')
+    parser.add_argument("--match_on_objid", help='Match on objectid column',action='store_true')
     args = parser.parse_args()
 
     # Avoid double negatives
@@ -38,14 +42,20 @@ def main():
 
     # Link redshift catalogue to truth for each epoch.
     epoch_dirs = glob.glob("%s/[0-9]/"%(args.output_root))
+    print('Have %d epoch directories'%(len(epoch_dirs)))
     for epoch_dir in epoch_dirs:
         print('Epoch directory: {}'.format(epoch_dir))
         if not dry_run:
             if args.tilefiles:
+                print('Concatenating tile files...')
                 build.concatenate_tilefiles(epoch_dir,args.sweep_mock_root)
 
+            print('Making sweeps...')
             build.make_mock_sweeps(args.config,args.source_name,args.input_dir,epoch_dir,map_id_file,
-                             args.sweep_mock_root,override_root = args.override_root, dry_run=dry_run)
+                                   args.sweep_mock_root,
+                                   override_root = args.override_root,
+                                   dry_run=dry_run,
+                                   match_on_objid=args.match_on_objid)
 
     if not dry_run:
         with open(os.path.join(args.sweep_mock_root,'sweep_params'),'w') as f:
