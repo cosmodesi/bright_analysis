@@ -68,16 +68,3 @@ def prepare_sweep_data(sweep_root_dir,data=None,epoch=0,filetype='observed'):
         data = np.array(data)
         
     return data
-
-        #else:
-        #    data_out_dir = os.path.split(data)[0]
-        #    if os.path.exists(data_out_dir):
-        #        datapath = data
-        #        data     = load_all_epoch_observed(sweep_root_dir,epoch=epoch)
-        #        t = Table(data)
-        #        t.write(datapath.format(epoch))
-        #        print(
-        #    else:
-        #        raise Exception('Cannot write data to %s, directory does not exist'%(data_out_dir))
-
-
