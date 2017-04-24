@@ -96,11 +96,14 @@ def make_directory_structure(config_file,source_name,map_id_filename,sweep_mock_
         original_root_mock_dir = root_mock_dir
         root_mock_dir          = override_root
 
-    # Recreate the variable part of the path for this mock under output_dir. To
-    # avoid trouble, insist that the output root cannot exist.
+    # Recreate the variable part of the path for this mock under output_dir. 
     print('Sweep mock output root: {}'.format(sweep_mock_root))
-    if os.path.exists(sweep_mock_root):
-        raise SweepDirExistsError('Output sweep root dir already exists, you need to manually delete it')
+
+    # This is not the right way to do the following, since that means
+    # additional sweeps for different mocks can't be added under the same root.
+    # To avoid trouble, insist that the output root cannot exist.
+    #if os.path.exists(sweep_mock_root):
+    #    raise SweepDirExistsError('Output sweep root dir already exists, you need to manually delete it')
 
     # No need to wrap this in try, since we guarentee the directory doesn't
     # exist.
