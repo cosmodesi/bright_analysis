@@ -58,7 +58,7 @@ def main():
                                    match_on_objid=args.match_on_objid)
 
     if not dry_run:
-        with open(os.path.join(args.sweep_mock_root,'sweep_params'),'w') as f:
+        with open(os.path.join(args.sweep_mock_root,'sweep_params_{}'.format(args.source_name)),'w') as f:
             f.write(yaml.dump({'time': datetime.datetime.now()}))
             f.write(yaml.dump(args.__dict__))
         print('Done!')
