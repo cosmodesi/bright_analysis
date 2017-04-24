@@ -105,9 +105,8 @@ def make_directory_structure(config_file,source_name,map_id_filename,sweep_mock_
     #if os.path.exists(sweep_mock_root):
     #    raise SweepDirExistsError('Output sweep root dir already exists, you need to manually delete it')
 
-    # No need to wrap this in try, since we guarentee the directory doesn't
-    # exist.
-    if not dry_run: os.makedirs(sweep_mock_root)
+    if not os.path.exists(sweep_mock_root):
+        if not dry_run: os.makedirs(sweep_mock_root)
 
     print('%d mock paths'%len(mock_paths))
     for mock_path in mock_paths:
@@ -121,9 +120,10 @@ def make_directory_structure(config_file,source_name,map_id_filename,sweep_mock_
 
         new_path = os.path.normpath(os.path.join(sweep_mock_root,mock_path))
         new_dir  = os.path.split(new_path)[0]
-        print('Creating path: %s'%(new_dir))
 
-        if not dry_run: os.makedirs(new_dir)
+        if not os.path.exists(sweep_mock_root):
+            print('Creating path: %s'%(new_dir))
+            if not dry_run: os.makedirs(new_dir)
     return
 
 ############################################################
@@ -318,7 +318,8 @@ def make_mock_sweeps(config_file,source_name,input_dir,epoch_dir,map_id_file_pat
         if filename_path.startswith(os.path.sep):
             filename_path = os.path.curdir + filename_path
 
-        os.makedirs(os.path.normpath(os.path.join(sweep_mock_root,filename_path,str(epoch))))
+        new_dir = os.path.normpath(os.path.join(sweep_mock_root,filename_path,str(epoch)))
+        if not os.path.exists(new_dir): os.makedirs(new_dir)
 
         new_path_status         = os.path.normpath(os.path.join(sweep_mock_root,filename_path,str(epoch),new_filename_status))
         new_path_observed       = os.path.normpath(os.path.join(sweep_mock_root,filename_path,str(epoch),new_filename_observed))
