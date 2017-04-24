@@ -41,7 +41,7 @@ import desimodel.footprint as footprint
 import desimodel.io
 
 from bright_analysis.util.match import match
-from bright_analysis.raw.io     import match_zcat_truth
+from bright_analysis.raw.io     import match_zcat_truth, read_all_tiles
 
 class SweepDirExistsError(Exception): pass
 
@@ -129,24 +129,10 @@ def concatenate_tilefiles(epoch_dir,sweep_mock_root):
     """
     epoch = int(os.path.split(epoch_dir.strip(os.path.sep))[-1])
     print('Epoch: {}'.format(epoch))
-
-    tilefiles = glob.glob('{}/fiberassign/tile_*.fits'.format(epoch_dir))
-    ntiles    = len(tilefiles)
-    print("Have {} tile files".format(ntiles))
-
+ 
     # Numbers of each tile
+    tilefiles, tiledata = read_all_tiles(epoch_dir)
     tilenum = np.array([int(os.path.splitext(os.path.basename(s))[0].split('_')[-1]) for s in tilefiles])
-
-    # Read all the tiles
-    t0 = time.time()
-    tiledata = list()
-    for tilefile in tilefiles:
-        f = fits.open(tilefile,'readonly',memmap=False)
-        tiledata.append(f[1].data)
-        f.close()
-    t1 = time.time()
-    
-    print('Read tile data in {}s'.format(t1-t0))
 
     # Stores original tile index after concatenation
     itile = np.concatenate([np.repeat(int(i),len(x)) for i,x in enumerate(tiledata)])
