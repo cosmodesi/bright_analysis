@@ -18,13 +18,48 @@ def read_config_file(config_file):
     return config_file
 
 ############################################################
+def read_all_tiles(epoch_dir):
+    """
+    Read all fiber maps (tiles) in a given epoch dir.
+    """
+    import glob
+
+    tilefiles = glob.glob('{}/fiberassign/tile_*.fits'.format(epoch_dir))
+    ntiles    = len(tilefiles)
+    print("Have {} tile files".format(ntiles))
+
+    # Read all the tiles
+    t0 = time.time()
+    tiledata = list()
+    for tilefile in tilefiles:
+        f = fits.open(tilefile,'readonly',memmap=False)
+        tiledata.append(f[1].data)
+        f.close()
+    t1 = time.time()
+
+    print('Read tile data in {}s'.format(t1-t0))
+
+    return tilefiles,tiledata
+
+############################################################
+def load_zcat(epoch_dir):
+    """
+    Load redshift catalogue for this epoch
+    """
+    t0 = time.time()
+    zcat = Table.read(os.path.join(epoch_dir, 'zcat.fits'))
+    t1 = time.time()
+    print('Read {} rows from zcat in {}s'.format(len(zcat), t1-t0))
+    return zcat
+
+
+############################################################
 TRUTH_CACHE  = None
 TARGET_CACHE = None
 def match_zcat_truth(input_dir,epoch_dir):
     """
     """
     global TRUTH_CACHE, TARGET_CACHE
-    assert(os.path.exists(config_file))
 
     # Time the whole routine
     print('Loading truth and zcat...'.format())
@@ -53,10 +88,7 @@ def match_zcat_truth(input_dir,epoch_dir):
         print('Have {} rows from target in memory'.format(len(target_table)))
 
     # Load redshift catalogue for this epoch
-    t0 = time.time()
-    zcat = Table.read(os.path.join(epoch_dir, 'zcat.fits'))
-    t1 = time.time()
-    print('Read {} rows from zcat in {}s'.format(len(zcat), t1-t0))
+    zcat = load_zcat(epoch_dir)
 
     t0 = time.time()
     itruth_for_izcat = match(zcat['TARGETID'],truth_table['TARGETID'])
