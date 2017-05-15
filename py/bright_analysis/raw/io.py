@@ -4,7 +4,7 @@ import os
 import time
 
 from astropy.table import Table
-
+import astropy.io.fits as fits
 from bright_analysis.util.match import match
 
 ############################################################
