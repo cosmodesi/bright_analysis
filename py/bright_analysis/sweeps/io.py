@@ -9,7 +9,7 @@ import numpy as np
 from   astropy.table import Table
 
 ############################################################
-def sweep_mock_roots(input_yaml,sweep_root_dir='./output/sweeps'):
+def sweep_mock_roots(input_yaml,sweep_root_dir='./output/sweep'):
     """
     Returns a dict, keys are the input.yaml names of each source class and
     values are the path to the sweeps for the corresponding mocks. Use to get
@@ -35,42 +35,17 @@ def sweep_mock_roots(input_yaml,sweep_root_dir='./output/sweeps'):
     return dict(roots)
 
 ############################################################
-def load_all_epoch(sweep_mock_root_dir,epoch=0,filetype='observed'):
-    """
-    As written this will only work if passed a sweep *sub*-root path (i.e. the
-    node above on particular type of mock) rather than the base sweep root
-    (output/sweep).
-    """
-    print('Loading data for epoch {:d} under {}'.format(epoch,sweep_mock_root_dir))
-
-    # Walk directories
-    iter_sweep_files = desitarget.io.iter_files(sweep_mock_root_dir, '',
-                                                ext="{}.fits".format(filetype))
-
-    t0 = time.time()
-    data = list()
-    for fpath in list(iter_sweep_files):
-        fpath_epoch = int(os.path.split(os.path.split(fpath)[0])[-1])
-        if fpath_epoch == epoch:
-            data.append(fits.getdata(fpath))
-    nfiles = len(data)
-    if nfiles == 0:
-        __fname__ = sys._getframe().f_code.co_name
-        raise Exception('{}({},{},{}) read zero files!'.format(__fname__,
-                                                               sweep_mock_root_dir,
-                                                               epoch,
-                                                               filetype))
-
-    data   = np.concatenate(data)
-    t1 = time.time()
-
-    print('Read {:d} rows from {:d} files in {:f}s'.format(len(data),nfiles,t1-t0))
-
-    return data
-
-############################################################
 def prepare_sweep_data(sweep_mock_root_dir,data=None,epoch=0,filetype='observed'):
     """
+    Reads (if necessary) and combines all the sweep data under a given root.
+
+    Arguments:
+        sweep_mock_root_dir: this should be one of the entries in the dict
+        returned by sweep_mock_roots().
+
+        data: either None (default), a path to a specific .fits.gz file from
+        which the combined data can be read, or a numpy array/astropy Table
+        containting the combined data (which is not re-read).
     """
     if data is None:
         # Load the data if not passed directly
@@ -102,6 +77,44 @@ def prepare_sweep_data(sweep_mock_root_dir,data=None,epoch=0,filetype='observed'
         data = np.array(data)
         print('Using existing table with {:d} rows'.format(len(data)))
         
+    return data
+
+
+############################################################
+def load_all_epoch(sweep_mock_root_dir,epoch=0,filetype='observed'):
+    """
+    Iterates over the sweep files under a given root and reads them into
+    memory. This is a lower-level routine called by prepare_sweep_data().
+
+    As written this will only work if passed a sweep *sub*-root path (i.e. the
+    node above on particular type of mock) rather than the base sweep root
+    (output/sweep).
+    """
+    print('Loading data for epoch {:d} under {}'.format(epoch,sweep_mock_root_dir))
+
+    # Walk directories
+    iter_sweep_files = desitarget.io.iter_files(sweep_mock_root_dir, '',
+                                                ext="{}.fits".format(filetype))
+
+    t0 = time.time()
+    data = list()
+    for fpath in list(iter_sweep_files):
+        fpath_epoch = int(os.path.split(os.path.split(fpath)[0])[-1])
+        if fpath_epoch == epoch:
+            data.append(fits.getdata(fpath))
+    nfiles = len(data)
+    if nfiles == 0:
+        __fname__ = sys._getframe().f_code.co_name
+        raise Exception('{}({},{},{}) read zero files!'.format(__fname__,
+                                                               sweep_mock_root_dir,
+                                                               epoch,
+                                                               filetype))
+
+    data   = np.concatenate(data)
+    t1 = time.time()
+
+    print('Read {:d} rows from {:d} files in {:f}s'.format(len(data),nfiles,t1-t0))
+
     return data
 
 ############################################################
