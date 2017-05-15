@@ -35,6 +35,7 @@ import time
 from astropy.table import Table, Column
 from desitarget.mock.io import decode_rownum_filenum
 from astropy.io import fits
+import h5py
 
 import desimodel
 import desimodel.footprint as footprint
@@ -148,7 +149,7 @@ def concatenate_tilefiles(epoch_dir,sweep_mock_root):
     tiledata_dir = os.path.normpath(os.path.join(sweep_mock_root,'tiles'))
     if not os.path.exists(tiledata_dir): os.makedirs(tiledata_dir)
     tiledata_path = os.path.join(tiledata_dir,'tiles_{}.fits'.format(epoch))
-    tiledata.write(tiledata_path)
+    tiledata.write(tiledata_path,overwrite=True)
     print('Wrote {}'.format(tiledata_path))
     return
 
@@ -228,8 +229,11 @@ def make_mock_sweeps(config_file,source_name,input_dir,epoch_dir,map_id_file_pat
         print('Reading mock file: {}'.format(filename))
         sys.stdout.flush()
 
-        if source_name == 'MWS_MAIN':
+        if source_name in ['MWS_MAIN','MWS_WD','MWS_NEARBY']:
             n_this_mock_file = fits.getheader(filename,1)['NAXIS2']
+        elif source_name in ['BGS']:
+            with h5py.File(filename) as f:
+                n_this_mock_file = f['/Header/number_galaxies'][...][0]
         else:
             raise Exception('Unrecognized source: {}'.format(source))
 
@@ -242,7 +246,17 @@ def make_mock_sweeps(config_file,source_name,input_dir,epoch_dir,map_id_file_pat
         observed_this_epoch   = np.repeat(False,n_this_mock_file)
 
         # Read the mock data for this file ID
-        data  = fits.getdata(filename,1)
+        if source_name in ['MWS_MAIN','MWS_WD','MWS_NEARBY']:
+            data  = fits.getdata(filename,1)
+        elif source_name in ['BGS']:
+            data = Table()
+            with h5py.File(filename) as f:
+                for recname in f['/Data']:
+                    d = f['/Data'][recname][...]
+                    data.add_column(Column(name=recname,data=d))
+        else:
+            raise Exception('Unrecognized source: {}'.format(source))
+
 
         # Set column names if not already set
         if ra_column is None:
@@ -305,7 +319,9 @@ def make_mock_sweeps(config_file,source_name,input_dir,epoch_dir,map_id_file_pat
 
         # Write various outputs
         filename_path, filename_file = os.path.split(filename)
-        base, ext                   = filename_file.split(os.path.extsep)
+        base, original_ext           = filename_file.split(os.path.extsep)
+        ext = 'fits' # Output fits, even if input is hdf5
+
         new_filename_status         = base + os.path.extsep + 'status'     + os.path.extsep + ext
         new_filename_observed       = base + os.path.extsep + 'observed'   + os.path.extsep + ext
         new_filename_unobserved     = base + os.path.extsep + 'unobserved' + os.path.extsep + ext
@@ -330,8 +346,8 @@ def make_mock_sweeps(config_file,source_name,input_dir,epoch_dir,map_id_file_pat
         # Write the status table, which has the same number of rows as the
         # origianl mock file (hence generally more than the sweep).
         t = Table((selected_as_target,observed_this_epoch), names=('SELECTED','OBSERVED'))
-        t.write(new_path_status)
-        print('Wrote {}'.format(new_path_status))
+        print('Writing {}'.format(new_path_status))
+        t.write(new_path_status,overwrite=True)
 
         # Provided that at least one target in this mock file has been
         # selected, write subsets of the mock file.
@@ -356,8 +372,8 @@ def make_mock_sweeps(config_file,source_name,input_dir,epoch_dir,map_id_file_pat
             t.add_column(Column(footprint_flag[observed_this_epoch],name='IN_FOOTPRINT'))
 
             # Strict check
-            assert(np.allclose(t['RA'],target_table[t['TARGETROW']]['RA'],atol=1e-5))
-            t.write(new_path_observed)
+            assert(np.allclose(t[ra_column],target_table[t['TARGETROW']]['RA'],atol=1e-5))
+            t.write(new_path_observed,overwrite=True)
             print('Wrote {}'.format(new_path_observed))
         
             # 2. Make the mock sweep for unobserved targets
@@ -368,8 +384,8 @@ def make_mock_sweeps(config_file,source_name,input_dir,epoch_dir,map_id_file_pat
             t.add_column(Column(footprint_flag[selected_not_observed],name='IN_FOOTPRINT'))
 
             # Strict check
-            assert(np.allclose(t['RA'],target_table[t['TARGETROW']]['RA'],atol=1e-5))
-            t.write(new_path_unobserved)
+            assert(np.allclose(t[ra_column],target_table[t['TARGETROW']]['RA'],atol=1e-5))
+            t.write(new_path_unobserved,overwrite=True)
             print('Wrote {}'.format(new_path_unobserved)) 
 
             # 3. Make a file extracted from targets for this mock brick
@@ -377,13 +393,13 @@ def make_mock_sweeps(config_file,source_name,input_dir,epoch_dir,map_id_file_pat
             subset_this_file = truth_rows_for_source[fileid_mask]
             t = Table(target_table[subset_this_file])[rows_this_file_all_sort]
             t.add_column(Column((footprint_flag_targets_truth[fileid_mask])[rows_this_file_all_sort],name='IN_FOOTPRINT'))
-            t.write(new_path_targets_subset)
+            t.write(new_path_targets_subset,overwrite=True)
             print('Wrote {}'.format(new_path_targets_subset))
 
             # 4. Make a file extracted from truth for this mock brick
             subset_this_file = truth_rows_for_source[fileid_mask]
             t = Table(truth_table[subset_this_file])[rows_this_file_all_sort]
             t.add_column(Column((footprint_flag_targets_truth[fileid_mask])[rows_this_file_all_sort],name='IN_FOOTPRINT'))
-            t.write(new_path_truth_subset)
+            t.write(new_path_truth_subset,overwrite=True)
             print('Wrote {}'.format(new_path_truth_subset))
     return
