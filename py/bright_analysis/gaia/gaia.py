@@ -6,7 +6,6 @@ import numpy      as np
 import datetime
 from   astropy.io    import fits
 from   astropy.table import Table, Column
-from   util          import easy_mkdirs
 
 import astropy.units as u
 

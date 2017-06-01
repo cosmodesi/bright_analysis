@@ -19,23 +19,35 @@ def main():
     """
     """
     parser = argparse.ArgumentParser()
-    parser.add_argument('mock_path')
+    parser.add_argument('mock_path',help='Path to mock file')
+    parser.add_argument('-o','--output',help='Location to write output (default is same dir as mock file)')
     args = parser.parse_args()
 
     assert(os.path.exists(mock_path))
 
     mock_dir,mock_file = os.path.split(args.mock_path)
-    gaia_file          = mock_file.replace('stars','gaia')
-    gaia_path          = os.path.join(mock_dir,gaia_file)
-    
+    gaia_base, ext     = mock_file.split(os.path.extsep)
+    assert(ext == 'fits')
+    gaia_file          = gaia_base + os.path.extsep + 'gaia' + os.path.extsep + 'fits'
+
+    if args.output is not None:
+        gaia_path          = os.path.join(args.output,gaia_file)
+    else:
+        gaia_path          = os.path.join(mock_dir,gaia_file)
+   
+    print('Reading mock input %s'%(mock_path))
+    t1 = time.time()
     desi_table = Table.read(mock_path,1)
+    t0 = time.time()
+    print('Time to read: %fs'%(t1-t0))
+
     t1 = time.time()
     gaia_table = gaia.make_gaia_observables(desi_table)
     t0 = time.time()
     print('Processed columns: %fs'%(t1-t0))
 
-    gaia_table.write(gaia_output_fits_path,overwrite=True)
-    print('Wrote: %s'%(gaia_output_fits_path))
+    gaia_table.write(gaia_path,overwrite=True)
+    print('Wrote: %s'%(gaia_path))
     print(gaia_table.columns)
 
 ############################################################
