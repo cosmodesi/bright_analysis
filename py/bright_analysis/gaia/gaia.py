@@ -10,7 +10,7 @@ from   astropy.table import Table, Column
 import astropy.units as u
 
 ############################################################
-def make_gaia_observables(desi_table):
+def make_gaia_observables(desi_table,dust='galaxia'):
     """
     """
     import pygaia
@@ -41,12 +41,44 @@ def make_gaia_observables(desi_table):
     gaia_table.add_column(Column(magI_nodust,name='I_Lupton_nodust',unit=1.0,
                                  description='J-C I-band magnitude converted from SDSS r, rmi following Lupton 2005'))
 
-    # Add extinction back (currently in a poor way!). If we care in detail we should know which V and I pygaia wants!
-    ext_coeffs_ctio = {'V':1.1800,
-                       'I':0.5066}
+    # Add extinction back (currently in a poor way!). If we care in detail we
+    # should know exactly which V and I pygaia wants!
+    if dust == 'galaxia':
+        # Galaxia dust equations use E(B-V) and coefficients Am/E(B-V).
+        #
+        # E_schelgel is seletive absorption to star in fiducial bands (V and B in this case).
+        #
+        #       Am = E_schlegel * A_over_EBV[band]
+        # mag_true = mag_nodust + Am
+        #
+        # Hence:
+        # mag_nodust = mag_true - E_schelgel*A_over_EBV[band]
 
-    magV = magV_nodust + desi_table['Ar']*ext_coeffs_ctio['V']
-    magI = magI_nodust + desi_table['Ar']*ext_coeffs_ctio['I']
+        # Extinction coefficients for SDSS from galaxia documentation
+        # These are Am/E(B-V) for Rv = 3.1 according to the Finkbeiner 99 law.
+        # These give the coefficients to use with E(B-V)_Schelgel get reddenings
+        # consistent with S&F 2011 and Schlafly 2010.
+        ext_coeffs_ctio = {'V':3.240,
+                           'I':1.962}
+
+        magV = magV_nodust + desi_table['ABV']*ext_coeffs_ctio['V']
+        magI = magI_nodust + desi_table['ABV']*ext_coeffs_ctio['I']
+
+    elif dust == 'galfast':
+        # GalFast dust equations use Ar and coefficients Am/Ar.
+        # Am0 is total absorption to star in fiducial band (r, in this case).
+        #
+        #       Am = Am0 * reddening[band]
+        # mag_true = mag_nodust + Am
+        #
+        # Hence:
+        # mag_nodust = mag_true - Am0*reddening[band]
+        
+        Ar_coeffs_ctio = {'V':1.1800,
+                          'I':0.5066}
+
+        magV = magV_nodust + desi_table['Ar']*Ar_coeffs_ctio['V']
+        magI = magI_nodust + desi_table['Ar']*Ar_coeffs_ctio['I']
 
     gaia_table.add_column(Column(magV,name='V_Lupton',unit=1.0,
                                  description='J-C V-band magnitude converted from SDSS g, gmr following Lupton 2005, with extinction'))

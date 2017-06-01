@@ -23,7 +23,7 @@ def main():
     parser.add_argument('-o','--output',help='Location to write output (default is same dir as mock file)')
     args = parser.parse_args()
 
-    assert(os.path.exists(mock_path))
+    assert(os.path.exists(args.mock_path))
 
     mock_dir,mock_file = os.path.split(args.mock_path)
     gaia_base, ext     = mock_file.split(os.path.extsep)
@@ -35,15 +35,15 @@ def main():
     else:
         gaia_path          = os.path.join(mock_dir,gaia_file)
    
-    print('Reading mock input %s'%(mock_path))
-    t1 = time.time()
-    desi_table = Table.read(mock_path,1)
+    print('Reading mock input %s'%(args.mock_path))
     t0 = time.time()
+    desi_table = Table.read(args.mock_path,1)
+    t1 = time.time()
     print('Time to read: %fs'%(t1-t0))
 
-    t1 = time.time()
-    gaia_table = gaia.make_gaia_observables(desi_table)
     t0 = time.time()
+    gaia_table = gaia.make_gaia_observables(desi_table)
+    t1 = time.time()
     print('Processed columns: %fs'%(t1-t0))
 
     gaia_table.write(gaia_path,overwrite=True)
