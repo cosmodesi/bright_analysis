@@ -1,0 +1,45 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
+import bright_analysis.gaia.gaia as gaia
+
+import sys
+import os
+
+import argparse
+import glob
+import yaml
+
+import time
+
+from   astropy.table import Table, Column
+
+############################################################
+def main():
+    """
+    """
+    parser = argparse.ArgumentParser()
+    parser.add_argument('mock_path')
+    args = parser.parse_args()
+
+    assert(os.path.exists(mock_path))
+
+    mock_dir,mock_file = os.path.split(args.mock_path)
+    gaia_file          = mock_file.replace('stars','gaia')
+    gaia_path          = os.path.join(mock_dir,gaia_file)
+    
+    desi_table = Table.read(mock_path,1)
+    t1 = time.time()
+    gaia_table = gaia.make_gaia_observables(desi_table)
+    t0 = time.time()
+    print('Processed columns: %fs'%(t1-t0))
+
+    gaia_table.write(gaia_output_fits_path,overwrite=True)
+    print('Wrote: %s'%(gaia_output_fits_path))
+    print(gaia_table.columns)
+
+############################################################
+if __name__ == '__main__':
+    from sys import exit
+    exit(main())
+
