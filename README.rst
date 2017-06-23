@@ -7,9 +7,11 @@ Introduction
 
 .. _DESI: https://desi.lbl.gov
 
-Collection of routines to reduce and analyse the output of DESI catalog
-('quick') survey simulations, specifically for bright epochs (MWS and BGS).
+Routines to manipulate and analyse the output of DESI catalogue ('quick')
+survey simulations, specifically for bright epochs (MWS and BGS).
 
+See https://github.com/cosmodesi/desibgsdev for BGS-specific science analysis
+code dvelopment.
 
 Installing a Product
 ====================
